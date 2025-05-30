@@ -9,7 +9,6 @@ from langchain_groq import ChatGroq
 from groq import Groq
 from langgraph.graph import START, END, StateGraph
 from langfuse.callback import CallbackHandler
-import langfuse
 
 from .configuration import Configuration, SearchAPI
 from .utils import deduplicate_and_format_sources, tavily_search, format_sources, strip_thinking_tokens
@@ -65,7 +64,6 @@ def generate_query(state: SummaryState, config: RunnableConfig):
     
     # Get the content
     content = result.choices[0].message.content
-    langfuse.trace(id=state.trace_id, output=content)
 
     # Parse the JSON response and get the query
     try:
@@ -166,7 +164,6 @@ def summarize_sources(state: SummaryState, config: RunnableConfig):
 
     # Strip thinking tokens if configured
     running_summary = result.choices[0].message.content
-    langfuse.trace(id=state.trace_id, output=running_summary)
     if configurable.strip_thinking_tokens:
         running_summary = strip_thinking_tokens(running_summary)
 
@@ -207,7 +204,6 @@ def reflect_on_summary(state: SummaryState, config: RunnableConfig):
         response_format={"type": "json_object"}
     )
     content = result.choices[0].message.content
-    langfuse.trace(id=state.trace_id, output=content)
 
     
     # Strip thinking tokens if configured
