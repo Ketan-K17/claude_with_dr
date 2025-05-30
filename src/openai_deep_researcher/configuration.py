@@ -16,15 +16,15 @@ class Configuration(BaseModel):
         title="Research Depth",
         description="Number of research iterations to perform"
     )
-    openai_model: str = Field(
-        default="gpt-4",
-        title="OpenAI Model Name",
-        description="Name of the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)"
+    groq_model: str = Field(
+        default="llama-3.3-70b-versatile",
+        title="Groq Model Name",
+        description="Name of the Groq model to use (e.g., llama-3.3-70b-versatile)"
     )
-    openai_api_key: Optional[str] = Field(
+    groq_api_key: Optional[str] = Field(
         default=None,
-        title="OpenAI API Key",
-        description="OpenAI API key for accessing the models"
+        title="Groq API Key",
+        description="Groq API key for accessing the models"
     )
     search_api: Literal["tavily"] = Field(
         default="tavily",

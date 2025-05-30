@@ -5,6 +5,7 @@ from typing_extensions import Literal
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 from langgraph.graph import START, END, StateGraph
 
 from .configuration import Configuration, SearchAPI
@@ -37,10 +38,10 @@ def generate_query(state: SummaryState, config: RunnableConfig):
     # Generate a query
     configurable = Configuration.from_runnable_config(config)
     
-    # Use OpenAI ChatGPT with JSON mode
-    llm_json_mode = ChatOpenAI(
-        model=configurable.openai_model,
-        api_key=configurable.openai_api_key,
+    # Use Groq with JSON mode
+    llm_json_mode = ChatGroq(
+        model=configurable.groq_model,
+        api_key=configurable.groq_api_key,
         temperature=configurable.temperature,
         response_format={"type": "json_object"}
     )
@@ -135,10 +136,9 @@ def summarize_sources(state: SummaryState, config: RunnableConfig):
     # Run the LLM
     configurable = Configuration.from_runnable_config(config)
     
-    # Use OpenAI ChatGPT
-    llm = ChatOpenAI(
-        model=configurable.openai_model,
-        api_key=configurable.openai_api_key,
+    llm = ChatGroq(
+        model=configurable.groq_model,
+        api_key=configurable.groq_api_key,
         temperature=configurable.temperature
     )
     
@@ -172,10 +172,10 @@ def reflect_on_summary(state: SummaryState, config: RunnableConfig):
     # Generate a query
     configurable = Configuration.from_runnable_config(config)
     
-    # Use OpenAI ChatGPT with JSON mode
-    llm_json_mode = ChatOpenAI(
-        model=configurable.openai_model,
-        api_key=configurable.openai_api_key,
+    # Use Groq with JSON mode
+    llm_json_mode = ChatGroq(
+        model=configurable.groq_model,
+        api_key=configurable.groq_api_key,
         temperature=configurable.temperature,
         response_format={"type": "json_object"}
     )

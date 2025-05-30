@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Example usage of the OpenAI Deep Researcher
+Example usage of the Groq Deep Researcher
 
 This script demonstrates how to use the refactored research assistant
-that now uses OpenAI's GPT models instead of local LLMs.
+that now uses Groq's models instead of local LLMs.
 """
 
 import os
@@ -18,10 +18,10 @@ def main():
     load_dotenv()
     
     # Check if required API keys are set
-    if not os.getenv("OPENAI_API_KEY"):
-        print("❌ Error: OPENAI_API_KEY environment variable is not set")
-        print("Please set your OpenAI API key:")
-        print("export OPENAI_API_KEY='your-api-key-here'")
+    if not os.getenv("GROQ_API_KEY"):
+        print("❌ Error: GROQ_API_KEY environment variable is not set")
+        print("Please set your Groq API key:")
+        print("export GROQ_API_KEY='your-api-key-here'")
         return
     
     if not os.getenv("TAVILY_API_KEY"):
@@ -39,7 +39,7 @@ def main():
     ]
     
     # Let user choose a topic or enter their own
-    print("🔬 OpenAI Deep Researcher")
+    print("🔬 Groq Deep Researcher")
     print("=" * 50)
     print("\nChoose a research topic:")
     for i, topic in enumerate(research_topics, 1):
@@ -67,7 +67,7 @@ def main():
     # Configuration for the research
     config = {
         "configurable": {
-            "openai_model": "gpt-4",  # Use GPT-4 for best results
+            "groq_model": "llama-3.3-70b-versatile",  # Use GPT-4 for best results
             "temperature": 0.1,       # Low temperature for focused research
             "max_web_research_loops": 3,  # 3 research iterations
             "fetch_full_page": True,  # Get full page content
