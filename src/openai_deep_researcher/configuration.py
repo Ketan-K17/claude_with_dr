@@ -16,15 +16,15 @@ class Configuration(BaseModel):
         title="Research Depth",
         description="Number of research iterations to perform"
     )
-    local_llm: str = Field(
-        default="llama3.2",
-        title="LLM Model Name",
-        description="Name of the LLM model to use"
+    openai_model: str = Field(
+        default="gpt-4",
+        title="OpenAI Model Name",
+        description="Name of the OpenAI model to use (e.g., gpt-4, gpt-3.5-turbo)"
     )
-    llm_provider: Literal["ollama", "lmstudio"] = Field(
-        default="ollama",
-        title="LLM Provider",
-        description="Provider for the LLM (Ollama or LMStudio)"
+    openai_api_key: Optional[str] = Field(
+        default=None,
+        title="OpenAI API Key",
+        description="OpenAI API key for accessing the models"
     )
     search_api: Literal["tavily"] = Field(
         default="tavily",
@@ -36,15 +36,10 @@ class Configuration(BaseModel):
         title="Fetch Full Page",
         description="Include the full page content in the search results"
     )
-    ollama_base_url: str = Field(
-        default="http://localhost:11434/",
-        title="Ollama Base URL",
-        description="Base URL for Ollama API"
-    )
-    lmstudio_base_url: str = Field(
-        default="http://localhost:1234/v1",
-        title="LMStudio Base URL",
-        description="Base URL for LMStudio OpenAI-compatible API"
+    temperature: float = Field(
+        default=0.0,
+        title="Temperature",
+        description="Temperature for OpenAI model sampling (0.0 to 1.0)"
     )
     strip_thinking_tokens: bool = Field(
         default=True,
@@ -66,6 +61,10 @@ class Configuration(BaseModel):
             name: os.environ.get(name.upper(), configurable.get(name))
             for name in cls.model_fields.keys()
         }
+        
+        # Special handling for OpenAI API key - check standard environment variable
+        if raw_values.get("openai_api_key") is None:
+            raw_values["openai_api_key"] = os.environ.get("OPENAI_API_KEY")
         
         # Filter out None values
         values = {k: v for k, v in raw_values.items() if v is not None}

@@ -4,25 +4,24 @@ from typing_extensions import Literal
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
-from langchain_ollama import ChatOllama
+from langchain_openai import ChatOpenAI
 from langgraph.graph import START, END, StateGraph
 
-from ollama_deep_researcher.configuration import Configuration, SearchAPI
-from ollama_deep_researcher.utils import deduplicate_and_format_sources, tavily_search, format_sources, strip_thinking_tokens
-from ollama_deep_researcher.state import SummaryState, SummaryStateInput, SummaryStateOutput
-from ollama_deep_researcher.prompts import query_writer_instructions, summarizer_instructions, reflection_instructions, get_current_date
-from ollama_deep_researcher.lmstudio import ChatLMStudio
+from .configuration import Configuration, SearchAPI
+from .utils import deduplicate_and_format_sources, tavily_search, format_sources, strip_thinking_tokens
+from .state import SummaryState, SummaryStateInput, SummaryStateOutput
+from .prompts import query_writer_instructions, summarizer_instructions, reflection_instructions, get_current_date
 
 # Nodes
 def generate_query(state: SummaryState, config: RunnableConfig):
     """LangGraph node that generates a search query based on the research topic.
     
-    Uses an LLM to create an optimized search query for web research based on
-    the user's research topic. Supports both LMStudio and Ollama as LLM providers.
+    Uses OpenAI's GPT models to create an optimized search query for web research based on
+    the user's research topic.
     
     Args:
         state: Current graph state containing the research topic
-        config: Configuration for the runnable, including LLM provider settings
+        config: Configuration for the runnable, including OpenAI model settings
         
     Returns:
         Dictionary with state update, including search_query key containing the generated query
@@ -38,21 +37,13 @@ def generate_query(state: SummaryState, config: RunnableConfig):
     # Generate a query
     configurable = Configuration.from_runnable_config(config)
     
-    # Choose the appropriate LLM based on the provider
-    if configurable.llm_provider == "lmstudio":
-        llm_json_mode = ChatLMStudio(
-            base_url=configurable.lmstudio_base_url, 
-            model=configurable.local_llm, 
-            temperature=0, 
-            format="json"
-        )
-    else: # Default to Ollama
-        llm_json_mode = ChatOllama(
-            base_url=configurable.ollama_base_url, 
-            model=configurable.local_llm, 
-            temperature=0, 
-            format="json"
-        )
+    # Use OpenAI ChatGPT with JSON mode
+    llm_json_mode = ChatOpenAI(
+        model=configurable.openai_model,
+        api_key=configurable.openai_api_key,
+        temperature=configurable.temperature,
+        response_format={"type": "json_object"}
+    )
     
     result = llm_json_mode.invoke(
         [SystemMessage(content=formatted_prompt),
@@ -110,13 +101,13 @@ def web_research(state: SummaryState, config: RunnableConfig):
 def summarize_sources(state: SummaryState, config: RunnableConfig):
     """LangGraph node that summarizes web research results.
     
-    Uses an LLM to create or update a running summary based on the newest web research 
+    Uses OpenAI's GPT models to create or update a running summary based on the newest web research 
     results, integrating them with any existing summary.
     
     Args:
         state: Current graph state containing research topic, running summary,
               and web research results
-        config: Configuration for the runnable, including LLM provider settings
+        config: Configuration for the runnable, including OpenAI model settings
         
     Returns:
         Dictionary with state update, including running_summary key containing the updated summary
@@ -144,19 +135,12 @@ def summarize_sources(state: SummaryState, config: RunnableConfig):
     # Run the LLM
     configurable = Configuration.from_runnable_config(config)
     
-    # Choose the appropriate LLM based on the provider
-    if configurable.llm_provider == "lmstudio":
-        llm = ChatLMStudio(
-            base_url=configurable.lmstudio_base_url, 
-            model=configurable.local_llm, 
-            temperature=0
-        )
-    else:  # Default to Ollama
-        llm = ChatOllama(
-            base_url=configurable.ollama_base_url, 
-            model=configurable.local_llm, 
-            temperature=0
-        )
+    # Use OpenAI ChatGPT
+    llm = ChatOpenAI(
+        model=configurable.openai_model,
+        api_key=configurable.openai_api_key,
+        temperature=configurable.temperature
+    )
     
     result = llm.invoke(
         [SystemMessage(content=summarizer_instructions),
@@ -179,7 +163,7 @@ def reflect_on_summary(state: SummaryState, config: RunnableConfig):
     
     Args:
         state: Current graph state containing the running summary and research topic
-        config: Configuration for the runnable, including LLM provider settings
+        config: Configuration for the runnable, including OpenAI model settings
         
     Returns:
         Dictionary with state update, including search_query key containing the generated follow-up query
@@ -188,21 +172,13 @@ def reflect_on_summary(state: SummaryState, config: RunnableConfig):
     # Generate a query
     configurable = Configuration.from_runnable_config(config)
     
-    # Choose the appropriate LLM based on the provider
-    if configurable.llm_provider == "lmstudio":
-        llm_json_mode = ChatLMStudio(
-            base_url=configurable.lmstudio_base_url, 
-            model=configurable.local_llm, 
-            temperature=0, 
-            format="json"
-        )
-    else: # Default to Ollama
-        llm_json_mode = ChatOllama(
-            base_url=configurable.ollama_base_url, 
-            model=configurable.local_llm, 
-            temperature=0, 
-            format="json"
-        )
+    # Use OpenAI ChatGPT with JSON mode
+    llm_json_mode = ChatOpenAI(
+        model=configurable.openai_model,
+        api_key=configurable.openai_api_key,
+        temperature=configurable.temperature,
+        response_format={"type": "json_object"}
+    )
     
     result = llm_json_mode.invoke(
         [SystemMessage(content=reflection_instructions.format(research_topic=state.research_topic)),
@@ -223,7 +199,7 @@ def reflect_on_summary(state: SummaryState, config: RunnableConfig):
     except (json.JSONDecodeError, KeyError, AttributeError):
         # If parsing fails or the key is not found, use a fallback query
         return {"search_query": f"Tell me more about {state.research_topic}"}
-        
+
 def finalize_summary(state: SummaryState):
     """LangGraph node that finalizes the research summary.
     
