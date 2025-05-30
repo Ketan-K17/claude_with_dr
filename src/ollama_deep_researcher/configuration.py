@@ -6,10 +6,7 @@ from typing import Any, Optional, Literal
 from langchain_core.runnables import RunnableConfig
 
 class SearchAPI(Enum):
-    PERPLEXITY = "perplexity"
     TAVILY = "tavily"
-    DUCKDUCKGO = "duckduckgo"
-    SEARXNG = "searxng"
 
 class Configuration(BaseModel):
     """The configurable fields for the research assistant."""
@@ -29,10 +26,10 @@ class Configuration(BaseModel):
         title="LLM Provider",
         description="Provider for the LLM (Ollama or LMStudio)"
     )
-    search_api: Literal["perplexity", "tavily", "duckduckgo", "searxng"] = Field(
-        default="duckduckgo",
+    search_api: Literal["tavily"] = Field(
+        default="tavily",
         title="Search API",
-        description="Web search API to use"
+        description="Web search API to use (Tavily only)"
     )
     fetch_full_page: bool = Field(
         default=True,

@@ -8,7 +8,7 @@ from langchain_ollama import ChatOllama
 from langgraph.graph import START, END, StateGraph
 
 from ollama_deep_researcher.configuration import Configuration, SearchAPI
-from ollama_deep_researcher.utils import deduplicate_and_format_sources, tavily_search, format_sources, perplexity_search, duckduckgo_search, searxng_search, strip_thinking_tokens, get_config_value
+from ollama_deep_researcher.utils import deduplicate_and_format_sources, tavily_search, format_sources, strip_thinking_tokens
 from ollama_deep_researcher.state import SummaryState, SummaryStateInput, SummaryStateOutput
 from ollama_deep_researcher.prompts import query_writer_instructions, summarizer_instructions, reflection_instructions, get_current_date
 from ollama_deep_researcher.lmstudio import ChatLMStudio
@@ -76,8 +76,7 @@ def generate_query(state: SummaryState, config: RunnableConfig):
 def web_research(state: SummaryState, config: RunnableConfig):
     """LangGraph node that performs web research using the generated search query.
     
-    Executes a web search using the configured search API (tavily, perplexity, 
-    duckduckgo, or searxng) and formats the results for further processing.
+    Executes a web search using Tavily search API and formats the results for further processing.
     
     Args:
         state: Current graph state containing the search query and research loop count
@@ -90,26 +89,23 @@ def web_research(state: SummaryState, config: RunnableConfig):
     # Configure
     configurable = Configuration.from_runnable_config(config)
 
-    # Get the search API
-    search_api = get_config_value(configurable.search_api)
+    # Search the web using Tavily
+    search_results = tavily_search(
+        state.search_query, 
+        fetch_full_page=configurable.fetch_full_page, 
+        max_results=3
+    )
+    search_str = deduplicate_and_format_sources(
+        search_results, 
+        max_tokens_per_source=1000, 
+        fetch_full_page=configurable.fetch_full_page
+    )
 
-    # Search the web
-    if search_api == "tavily":
-        search_results = tavily_search(state.search_query, fetch_full_page=configurable.fetch_full_page, max_results=1)
-        search_str = deduplicate_and_format_sources(search_results, max_tokens_per_source=1000, fetch_full_page=configurable.fetch_full_page)
-    elif search_api == "perplexity":
-        search_results = perplexity_search(state.search_query, state.research_loop_count)
-        search_str = deduplicate_and_format_sources(search_results, max_tokens_per_source=1000, fetch_full_page=configurable.fetch_full_page)
-    elif search_api == "duckduckgo":
-        search_results = duckduckgo_search(state.search_query, max_results=3, fetch_full_page=configurable.fetch_full_page)
-        search_str = deduplicate_and_format_sources(search_results, max_tokens_per_source=1000, fetch_full_page=configurable.fetch_full_page)
-    elif search_api == "searxng":
-        search_results = searxng_search(state.search_query, max_results=3, fetch_full_page=configurable.fetch_full_page)
-        search_str = deduplicate_and_format_sources(search_results, max_tokens_per_source=1000, fetch_full_page=configurable.fetch_full_page)
-    else:
-        raise ValueError(f"Unsupported search API: {configurable.search_api}")
-
-    return {"sources_gathered": [format_sources(search_results)], "research_loop_count": state.research_loop_count + 1, "web_research_results": [search_str]}
+    return {
+        "sources_gathered": [format_sources(search_results)], 
+        "research_loop_count": state.research_loop_count + 1, 
+        "web_research_results": [search_str]
+    }
 
 def summarize_sources(state: SummaryState, config: RunnableConfig):
     """LangGraph node that summarizes web research results.

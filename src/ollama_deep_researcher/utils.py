@@ -1,50 +1,27 @@
 import os
 import httpx
-import requests
 from typing import Dict, Any, List, Union, Optional
 
 from markdownify import markdownify
 from langsmith import traceable
 from tavily import TavilyClient
-from duckduckgo_search import DDGS
-
-from langchain_community.utilities import SearxSearchWrapper
-
-def get_config_value(value: Any) -> str:
-    """
-    Convert configuration values to string format, handling both string and enum types.
-    
-    Args:
-        value (Any): The configuration value to process. Can be a string or an Enum.
-    
-    Returns:
-        str: The string representation of the value.
-        
-    Examples:
-        >>> get_config_value("tavily")
-        'tavily'
-        >>> get_config_value(SearchAPI.TAVILY)
-        'tavily'
-    """
-    return value if isinstance(value, str) else value.value
 
 def strip_thinking_tokens(text: str) -> str:
     """
-    Remove <think> and </think> tags and their content from the text.
-    
-    Iteratively removes all occurrences of content enclosed in thinking tokens.
+    Remove thinking tokens from text.
     
     Args:
-        text (str): The text to process
+        text (str): The input text that may contain thinking tokens
         
     Returns:
-        str: The text with thinking tokens and their content removed
+        str: Text with thinking tokens removed
     """
-    while "<think>" in text and "</think>" in text:
-        start = text.find("<think>")
-        end = text.find("</think>") + len("</think>")
-        text = text[:start] + text[end:]
-    return text
+    import re
+    # Remove <think>...</think> blocks
+    text = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+    # Remove any standalone <think> or </think> tags
+    text = re.sub(r'</?think>', '', text)
+    return text.strip()
 
 def deduplicate_and_format_sources(
     search_response: Union[Dict[str, Any], List[Dict[str, Any]]], 
@@ -151,112 +128,6 @@ def fetch_raw_content(url: str) -> Optional[str]:
         return None
 
 @traceable
-def duckduckgo_search(query: str, max_results: int = 3, fetch_full_page: bool = False) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Search the web using DuckDuckGo and return formatted results.
-    
-    Uses the DDGS library to perform web searches through DuckDuckGo.
-    
-    Args:
-        query (str): The search query to execute
-        max_results (int, optional): Maximum number of results to return. Defaults to 3.
-        fetch_full_page (bool, optional): Whether to fetch full page content from result URLs. 
-                                         Defaults to False.
-    Returns:
-        Dict[str, List[Dict[str, Any]]]: Search response containing:
-            - results (list): List of search result dictionaries, each containing:
-                - title (str): Title of the search result
-                - url (str): URL of the search result
-                - content (str): Snippet/summary of the content
-                - raw_content (str or None): Full page content if fetch_full_page is True,
-                                            otherwise same as content
-    """
-    try:
-        with DDGS() as ddgs:
-            results = []
-            search_results = list(ddgs.text(query, max_results=max_results))
-            
-            for r in search_results:
-                url = r.get('href')
-                title = r.get('title')
-                content = r.get('body')
-                
-                if not all([url, title, content]):
-                    print(f"Warning: Incomplete result from DuckDuckGo: {r}")
-                    continue
-
-                raw_content = content
-                if fetch_full_page:
-                    raw_content = fetch_raw_content(url)
-                
-                # Add result to list
-                result = {
-                    "title": title,
-                    "url": url,
-                    "content": content,
-                    "raw_content": raw_content
-                }
-                results.append(result)
-            
-            return {"results": results}
-    except Exception as e:
-        print(f"Error in DuckDuckGo search: {str(e)}")
-        print(f"Full error details: {type(e).__name__}")
-        return {"results": []}
-
-@traceable
-def searxng_search(query: str, max_results: int = 3, fetch_full_page: bool = False) -> Dict[str, List[Dict[str, Any]]]:
-    """
-    Search the web using SearXNG and return formatted results.
-    
-    Uses the SearxSearchWrapper to perform searches through a SearXNG instance.
-    The SearXNG host URL is read from the SEARXNG_URL environment variable
-    or defaults to http://localhost:8888.
-    
-    Args:
-        query (str): The search query to execute
-        max_results (int, optional): Maximum number of results to return. Defaults to 3.
-        fetch_full_page (bool, optional): Whether to fetch full page content from result URLs.
-                                         Defaults to False.
-        
-    Returns:
-        Dict[str, List[Dict[str, Any]]]: Search response containing:
-            - results (list): List of search result dictionaries, each containing:
-                - title (str): Title of the search result
-                - url (str): URL of the search result
-                - content (str): Snippet/summary of the content
-                - raw_content (str or None): Full page content if fetch_full_page is True,
-                                           otherwise same as content
-    """
-    host=os.environ.get("SEARXNG_URL", "http://localhost:8888")
-    s = SearxSearchWrapper(searx_host=host)
-
-    results = []
-    search_results = s.results(query, num_results=max_results)
-    for r in search_results:
-        url = r.get('link')
-        title = r.get('title')
-        content = r.get('snippet')
-        
-        if not all([url, title, content]):
-            print(f"Warning: Incomplete result from SearXNG: {r}")
-            continue
-
-        raw_content = content
-        if fetch_full_page:
-            raw_content = fetch_raw_content(url)
-        
-        # Add result to list
-        result = {
-            "title": title,
-            "url": url,
-            "content": content,
-            "raw_content": raw_content
-        }
-        results.append(result)
-    return {"results": results}
-    
-@traceable
 def tavily_search(query: str, fetch_full_page: bool = True, max_results: int = 3) -> Dict[str, List[Dict[str, Any]]]:
     """
     Search the web using the Tavily API and return formatted results.
@@ -284,82 +155,3 @@ def tavily_search(query: str, fetch_full_page: bool = True, max_results: int = 3
     return tavily_client.search(query, 
                          max_results=max_results, 
                          include_raw_content=fetch_full_page)
-
-@traceable
-def perplexity_search(query: str, perplexity_search_loop_count: int = 0) -> Dict[str, Any]:
-    """
-    Search the web using the Perplexity API and return formatted results.
-    
-    Uses the Perplexity API to perform searches with the 'sonar-pro' model.
-    Requires a PERPLEXITY_API_KEY environment variable to be set.
-    
-    Args:
-        query (str): The search query to execute
-        perplexity_search_loop_count (int, optional): The loop step for perplexity search
-                                                     (used for source labeling). Defaults to 0.
-  
-    Returns:
-        Dict[str, Any]: Search response containing:
-            - results (list): List of search result dictionaries, each containing:
-                - title (str): Title of the search result (includes search counter)
-                - url (str): URL of the citation source
-                - content (str): Content of the response or reference to main content
-                - raw_content (str or None): Full content for the first source, None for additional
-                                            citation sources
-                                            
-    Raises:
-        requests.exceptions.HTTPError: If the API request fails
-    """
-
-    headers = {
-        "accept": "application/json",
-        "content-type": "application/json",
-        "Authorization": f"Bearer {os.getenv('PERPLEXITY_API_KEY')}"
-    }
-    
-    payload = {
-        "model": "sonar-pro",
-        "messages": [
-            {
-                "role": "system",
-                "content": "Search the web and provide factual information with sources."
-            },
-            {
-                "role": "user",
-                "content": query
-            }
-        ]
-    }
-    
-    response = requests.post(
-        "https://api.perplexity.ai/chat/completions",
-        headers=headers,
-        json=payload
-    )
-    response.raise_for_status()  # Raise exception for bad status codes
-    
-    # Parse the response
-    data = response.json()
-    content = data["choices"][0]["message"]["content"]
-
-    # Perplexity returns a list of citations for a single search result
-    citations = data.get("citations", ["https://perplexity.ai"])
-    
-    # Return first citation with full content, others just as references
-    results = [{
-        "title": f"Perplexity Search {perplexity_search_loop_count + 1}, Source 1",
-        "url": citations[0],
-        "content": content,
-        "raw_content": content
-    }]
-    
-    # Add additional citations without duplicating content
-    for i, citation in enumerate(citations[1:], start=2):
-        results.append({
-            "title": f"Perplexity Search {perplexity_search_loop_count + 1}, Source {i}",
-            "url": citation,
-            "content": "See above for full content",
-            "raw_content": None
-        })
-    
-    return {"results": results}
