@@ -6,12 +6,21 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
 from langchain_openai import ChatOpenAI
 from langchain_groq import ChatGroq
+from groq import Groq
 from langgraph.graph import START, END, StateGraph
+from langfuse.callback import CallbackHandler
+import langfuse
 
 from .configuration import Configuration, SearchAPI
 from .utils import deduplicate_and_format_sources, tavily_search, format_sources, strip_thinking_tokens
 from .state import SummaryState, SummaryStateInput, SummaryStateOutput
 from .prompts import query_writer_instructions, summarizer_instructions, reflection_instructions, get_current_date
+
+client = Groq()
+
+# Initialize Langfuse CallbackHandler for tracing
+langfuse_handler = CallbackHandler()
+
 
 # Nodes
 def generate_query(state: SummaryState, config: RunnableConfig):
@@ -37,22 +46,26 @@ def generate_query(state: SummaryState, config: RunnableConfig):
 
     # Generate a query
     configurable = Configuration.from_runnable_config(config)
-    
-    # Use Groq with JSON mode
-    llm_json_mode = ChatGroq(
+
+    result = client.chat.completions.create(
         model=configurable.groq_model,
-        api_key=configurable.groq_api_key,
         temperature=configurable.temperature,
+        messages=[
+            {
+                "role": "system",
+                "content": formatted_prompt
+            },
+            {
+                "role": "user",
+                "content": "Generate a query for web search:"
+            }
+        ],
         response_format={"type": "json_object"}
     )
     
-    result = llm_json_mode.invoke(
-        [SystemMessage(content=formatted_prompt),
-        HumanMessage(content=f"Generate a query for web search:")]
-    )
-    
     # Get the content
-    content = result.content
+    content = result.choices[0].message.content
+    langfuse.trace(id=state.trace_id, output=content)
 
     # Parse the JSON response and get the query
     try:
@@ -136,19 +149,24 @@ def summarize_sources(state: SummaryState, config: RunnableConfig):
     # Run the LLM
     configurable = Configuration.from_runnable_config(config)
     
-    llm = ChatGroq(
+    result = client.chat.completions.create(
         model=configurable.groq_model,
-        api_key=configurable.groq_api_key,
-        temperature=configurable.temperature
-    )
-    
-    result = llm.invoke(
-        [SystemMessage(content=summarizer_instructions),
-        HumanMessage(content=human_message_content)]
+        temperature=configurable.temperature,
+        messages=[
+            {
+                "role": "system",
+                "content": summarizer_instructions
+            },
+            {
+                "role": "user",
+                "content": human_message_content
+            }
+        ]
     )
 
     # Strip thinking tokens if configured
-    running_summary = result.content
+    running_summary = result.choices[0].message.content
+    langfuse.trace(id=state.trace_id, output=running_summary)
     if configurable.strip_thinking_tokens:
         running_summary = strip_thinking_tokens(running_summary)
 
@@ -173,22 +191,29 @@ def reflect_on_summary(state: SummaryState, config: RunnableConfig):
     configurable = Configuration.from_runnable_config(config)
     
     # Use Groq with JSON mode
-    llm_json_mode = ChatGroq(
+    result = client.chat.completions.create(
         model=configurable.groq_model,
-        api_key=configurable.groq_api_key,
         temperature=configurable.temperature,
+        messages=[
+            {
+                "role": "system",
+                "content": reflection_instructions.format(research_topic=state.research_topic)
+            },
+            {
+                "role": "user",
+                "content": f"Reflect on our existing knowledge: \n === \n {state.running_summary}, \n === \n And now identify a knowledge gap and generate a follow-up web search query:"
+            }
+        ],
         response_format={"type": "json_object"}
     )
-    
-    result = llm_json_mode.invoke(
-        [SystemMessage(content=reflection_instructions.format(research_topic=state.research_topic)),
-        HumanMessage(content=f"Reflect on our existing knowledge: \n === \n {state.running_summary}, \n === \n And now identify a knowledge gap and generate a follow-up web search query:")]
-    )
+    content = result.choices[0].message.content
+    langfuse.trace(id=state.trace_id, output=content)
+
     
     # Strip thinking tokens if configured
     try:
         # Try to parse as JSON first
-        reflection_content = json.loads(result.content)
+        reflection_content = json.loads(content)
         # Get the follow-up query
         query = reflection_content.get('follow_up_query')
         # Check if query is None or empty
@@ -267,4 +292,4 @@ builder.add_edge("summarize_sources", "reflect_on_summary")
 builder.add_conditional_edges("reflect_on_summary", route_research)
 builder.add_edge("finalize_summary", END)
 
-graph = builder.compile()
+graph = builder.compile().with_config({"callbacks": [langfuse_handler]})
