@@ -14,6 +14,8 @@ from .configuration import Configuration, SearchAPI
 from .utils import deduplicate_and_format_sources, tavily_search, format_sources, strip_thinking_tokens
 from .state import SummaryState, SummaryStateInput, SummaryStateOutput
 from .prompts import query_writer_instructions, summarizer_instructions, reflection_instructions, get_current_date
+from dotenv import load_dotenv
+load_dotenv()
 
 client = Groq()
 
