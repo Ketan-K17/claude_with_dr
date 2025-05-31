@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Groq Deep Researcher App
 
@@ -10,9 +9,12 @@ import os
 from dotenv import load_dotenv
 from src.openai_deep_researcher.graph import graph
 from src.openai_deep_researcher.state import SummaryStateInput
+from mcp.server.fastmcp import FastMCP
 
+mcp = FastMCP("claude_deep_researcher")
 
-def run_research(research_topic: str) -> str:
+@mcp.tool()
+async def run_research(research_topic: str) -> str:
     """
     Run the research workflow for a given topic and return the summary.
     
@@ -61,41 +63,42 @@ def run_research(research_topic: str) -> str:
         raise Exception(f"Research failed: {str(e)}")
 
 
-def main():
-    """Main function for standalone script usage."""
+# def main():
+#     """Main function for standalone script usage."""
     
-    print("🔬 Groq Deep Researcher")
-    print("=" * 50)
+#     print("🔬 Groq Deep Researcher")
+#     print("=" * 50)
     
-    try:
-        # Get research topic from user
-        research_topic = input("Enter your research topic: ").strip()
+#     try:
+#         # Get research topic from user
+#         research_topic = input("Enter your research topic: ").strip()
         
-        if not research_topic:
-            print("❌ Error: No topic entered")
-            return
+#         if not research_topic:
+#             print("❌ Error: No topic entered")
+#             return
         
-        print(f"\n🚀 Starting research on: {research_topic}")
-        print("⏳ This may take a few minutes...")
-        print("-" * 50)
+#         print(f"\n🚀 Starting research on: {research_topic}")
+#         print("⏳ This may take a few minutes...")
+#         print("-" * 50)
         
-        # Run the research
-        summary = run_research(research_topic)
+#         # Run the research
+#         summary = run_research(research_topic)
         
-        # Display results
-        print("\n📊 Research Complete!")
-        print("=" * 50)
-        print(summary)
+#         # Display results
+#         print("\n📊 Research Complete!")
+#         print("=" * 50)
+#         print(summary)
         
-    except ValueError as e:
-        print(f"\n❌ Configuration Error: {str(e)}")
-        print("Please check your environment variables.")
-    except Exception as e:
-        print(f"\n❌ Error during research: {str(e)}")
-        print("Please check your API keys and network connection.")
-    except KeyboardInterrupt:
-        print("\n👋 Research cancelled")
+#     except ValueError as e:
+#         print(f"\n❌ Configuration Error: {str(e)}")
+#         print("Please check your environment variables.")
+#     except Exception as e:
+#         print(f"\n❌ Error during research: {str(e)}")
+#         print("Please check your API keys and network connection.")
+#     except KeyboardInterrupt:
+#         print("\n👋 Research cancelled")
 
 
 if __name__ == "__main__":
-    main() 
+    print("Starting claude deep researcher server...")
+    mcp.run(transport='stdio')
