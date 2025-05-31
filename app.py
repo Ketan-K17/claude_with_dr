@@ -53,8 +53,8 @@ async def run_research(research_topic: str) -> str:
     input_state = SummaryStateInput(research_topic=research_topic)
     
     try:
-        # Run the research
-        result = graph.invoke(input_state, config=config)
+        # Run the research asynchronously
+        result = await graph.ainvoke(input_state, config=config)
         
         # Return the summary
         return result["running_summary"]
