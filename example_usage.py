@@ -8,8 +8,8 @@ that now uses Groq's models instead of local LLMs.
 
 import os
 from dotenv import load_dotenv
-from src.openai_deep_researcher.graph import graph
-from src.openai_deep_researcher.state import SummaryStateInput
+from src.claude_deep_researcher.graph import graph
+from src.claude_deep_researcher.state import SummaryStateInput
 
 def main():
     """Main function to demonstrate the research assistant."""

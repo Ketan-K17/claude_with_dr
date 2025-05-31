@@ -7,8 +7,8 @@ and get the summary results. Can be used programmatically or as a standalone scr
 
 import os
 from dotenv import load_dotenv
-from src.openai_deep_researcher.graph import graph
-from src.openai_deep_researcher.state import SummaryStateInput
+from src.claude_deep_researcher.graph import graph
+from src.claude_deep_researcher.state import SummaryStateInput
 from mcp.server.fastmcp import FastMCP
 
 mcp = FastMCP("claude_deep_researcher")
